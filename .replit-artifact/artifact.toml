@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Bun 'N Bite"
+version = "1.0.0"
+id = "artifacts/bun-n-bite"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 24677
+
+[services.development]
+run = "pnpm --filter @workspace/bun-n-bite run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/bun-n-bite", "run", "build" ]
+publicDir = "artifacts/bun-n-bite/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "24677"
+BASE_PATH = "/"

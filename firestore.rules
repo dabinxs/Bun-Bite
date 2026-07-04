@@ -1,0 +1,45 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function ownsUserDocument(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    match /users/{userId} {
+      allow read, create, update, delete: if ownsUserDocument(userId);
+
+      match /cart/{cartItemId} {
+        allow read, create, update, delete: if ownsUserDocument(userId);
+      }
+
+      match /addresses/{addressId} {
+        allow read, create, update, delete: if ownsUserDocument(userId);
+      }
+
+      match /favorites/{favoriteId} {
+        allow read, create, update, delete: if ownsUserDocument(userId);
+      }
+
+      match /orders/{orderId} {
+        allow read, create: if ownsUserDocument(userId);
+        allow update, delete: if false;
+      }
+
+      match /voucherRedemptions/{voucherCode} {
+        allow read, create: if ownsUserDocument(userId);
+        allow update, delete: if false;
+      }
+    }
+
+    match /orders/{orderId} {
+      allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && resource.data.userId == request.auth.uid;
+      allow update, delete: if false;
+    }
+  }
+}
