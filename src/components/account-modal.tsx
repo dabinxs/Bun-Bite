@@ -87,7 +87,7 @@ export default function AccountModal() {
           />
 
           <h2 className="mt-4 font-display text-3xl font-black">
-            Create an account
+            {authMode === "login" ? "Sign in your AccountS" : "Create an account"}
           </h2>
 
           <p className="mt-3 text-sm leading-relaxed text-white/50">

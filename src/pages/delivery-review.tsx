@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { useLocation } from "wouter";
 import {
+  Banknote,
   Bike,
   CheckCircle2,
   Clock,
+  CreditCard,
   Edit3,
   Home,
   Mail,
@@ -15,6 +17,7 @@ import {
   User,
   X,
 } from "lucide-react";
+import MapPicker from "@/components/MapPicker";
 import Navbar from "@/components/navbar";
 import { CustomizeModal, PRODUCTS } from "@/components/menu";
 import VoucherBox from "@/components/voucher-box";
@@ -37,7 +40,7 @@ import {
   type CartCustomization,
   type CartItem,
 } from "@/lib/cart";
-import { clearUserFirestoreCart, createOrder } from "@/lib/orders";
+import { clearUserFirestoreCart, createOrder, type PaymentMethod } from "@/lib/orders";
 import {
   calculateVoucherDiscount,
   hasUserRedeemedVoucher,
@@ -61,6 +64,33 @@ interface PersonalDetails {
 }
 
 type DeliveryOption = "standard" | "priority";
+
+type DeliveryPaymentMethod = Extract<PaymentMethod, "cash_on_delivery" | "paymongo">;
+
+type LocationValue = {
+  lat: number;
+  lng: number;
+};
+
+const PAYMENT_METHODS: Array<{
+  id: DeliveryPaymentMethod;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  {
+    id: "cash_on_delivery",
+    title: "Cash on Delivery",
+    description: "Pay the rider when your order arrives.",
+    icon: Banknote,
+  },
+  {
+    id: "paymongo",
+    title: "Online Payment",
+    description: "Pay by GCash, card, or QRPH during secure checkout.",
+    icon: CreditCard,
+  },
+];
 
 const EMPTY_DETAILS: PersonalDetails = {
   email: "",
@@ -117,9 +147,14 @@ export default function DeliveryReviewPage({
   const { requireAuth, user, profile } = useAuth();
   const [, setLocation] = useLocation();
   const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddressState>(FALLBACK_DELIVERY_ADDRESS);
+  const [deliveryLocation, setDeliveryLocation] = useState<LocationValue>({
+    lat: 14.3036,
+    lng: 121.0781,
+  });
   const [noteToRider, setNoteToRider] = useState("");
   const [contactless, setContactless] = useState(true);
   const [deliveryOption, setDeliveryOption] = useState<DeliveryOption>("standard");
+  const [paymentMethod, setPaymentMethod] = useState<DeliveryPaymentMethod>("cash_on_delivery");
   const [personalDetails, setPersonalDetails] = useState<PersonalDetails>(EMPTY_DETAILS);
   const [detailsSaved, setDetailsSaved] = useState(false);
   const [detailsSaving, setDetailsSaving] = useState(false);
@@ -594,6 +629,10 @@ export default function DeliveryReviewPage({
               landmark: deliveryAddress.landmark,
               contactNumber: personalDetails.mobile || deliveryAddress.contactNumber,
               isDefault: deliveryAddress.isDefault,
+              location: {
+                lat: deliveryLocation.lat,
+                lng: deliveryLocation.lng,
+              },
             },
             noteToRider: noteToRider.trim(),
             contactless,
@@ -608,7 +647,7 @@ export default function DeliveryReviewPage({
                 discountAmount: totals.voucherDiscount,
               }
             : null,
-          paymentMethod: "Not selected",
+          paymentMethod,
         });
 
         await clearUserFirestoreCart(currentUser.uid);
@@ -698,6 +737,24 @@ export default function DeliveryReviewPage({
                     onChange={(value) => updateAddress("landmark", value)}
                     placeholder="Nearby landmark, gate, or building"
                   />
+                  <div className="rounded-3xl border border-white/10 bg-black/20 p-4">
+                    <div className="mb-3">
+                      <p className="text-xs font-black uppercase tracking-[0.16em] text-white/35">
+                        Pin delivery location
+                      </p>
+                      <p className="mt-1 text-sm text-white/40">
+                        Use your current location or drag the pin to your exact delivery spot.
+                      </p>
+                    </div>
+
+                    <MapPicker
+                      value={deliveryLocation}
+                      onChange={(location) => {
+                        setDeliveryLocation(location);
+                        setAddressSaved(false);
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {addressError && (
@@ -765,6 +822,33 @@ export default function DeliveryReviewPage({
                     price={`+ ${formatCartMoney(30)}`}
                     onClick={() => setDeliveryOption("priority")}
                   />
+                </div>
+              </ReviewCard>
+
+              <ReviewCard>
+                <div className="mb-5">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                    Mode of payment
+                  </p>
+                  <h2 className="mt-2 font-display text-2xl font-black sm:text-3xl">
+                    Choose how to pay
+                  </h2>
+                  <p className="mt-2 text-sm text-white/40">
+                    Your selected payment mode will be saved with this delivery order.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-3">
+                  {PAYMENT_METHODS.map((method) => (
+                    <PaymentMethodButton
+                      key={method.id}
+                      active={paymentMethod === method.id}
+                      icon={method.icon}
+                      title={method.title}
+                      description={method.description}
+                      onClick={() => setPaymentMethod(method.id)}
+                    />
+                  ))}
                 </div>
               </ReviewCard>
 
@@ -891,6 +975,7 @@ export default function DeliveryReviewPage({
                 onApplyVoucher={handleApplyVoucher}
                 onRemoveVoucher={handleRemoveVoucher}
                 total={totals.total}
+                paymentMethodLabel={getPaymentMethodLabel(paymentMethod)}
                 canPlaceOrder={canPlaceOrder}
                 onAddMoreItems={addMoreItems}
                 onEditItem={(item) => requireAuth(() => setEditingItem(item))}
@@ -1321,6 +1406,7 @@ function OrderSummary({
   onApplyVoucher,
   onRemoveVoucher,
   total,
+  paymentMethodLabel,
   canPlaceOrder,
   onAddMoreItems,
   onEditItem,
@@ -1344,6 +1430,7 @@ function OrderSummary({
   onApplyVoucher: () => void;
   onRemoveVoucher: () => void;
   total: number;
+  paymentMethodLabel: string;
   canPlaceOrder: boolean;
   onAddMoreItems: () => void;
   onEditItem: (item: CartItem) => void;
@@ -1454,6 +1541,7 @@ function OrderSummary({
         {voucherDiscount > 0 && (
           <SummaryLine label="Voucher discount" value={`- ${formatMoney(voucherDiscount, summaryCurrency)}`} />
         )}
+        <SummaryLine label="Payment method" value={paymentMethodLabel} />
         <div className="flex items-end justify-between gap-4 pt-3">
           <div>
             <p className="font-display text-2xl font-black">Total</p>
@@ -1487,6 +1575,40 @@ function OrderSummary({
   );
 }
 
+function PaymentMethodButton({
+  active,
+  icon: Icon,
+  title,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-[132px] flex-col items-start gap-3 rounded-2xl border p-4 text-left transition-all ${
+        active
+          ? "border-[#FF3B3B]/45 bg-[#FF3B3B]/12 shadow-[0_18px_45px_rgba(255,59,59,0.12)]"
+          : "border-white/10 bg-black/20 hover:border-[#FF3B3B]/30"
+      }`}
+    >
+      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-black/30">
+        <Icon className="h-5 w-5 text-[#FF4D2E]" />
+      </span>
+      <span>
+        <span className="block text-sm font-black text-white">{title}</span>
+        <span className="mt-1 block text-xs leading-relaxed text-white/40">{description}</span>
+      </span>
+    </button>
+  );
+}
+
 function SummaryLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between text-white/55">
@@ -1498,6 +1620,10 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
 
 function getCartCurrency(items: CartItem[]) {
   return items.find((item) => item.currency)?.currency || "PHP";
+}
+
+function getPaymentMethodLabel(method: DeliveryPaymentMethod) {
+  return PAYMENT_METHODS.find((option) => option.id === method)?.title || "Cash on Delivery";
 }
 
 function formatMoney(value: number, currency: CartCurrency = "PHP") {

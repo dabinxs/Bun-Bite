@@ -14,6 +14,9 @@ import { buildCartItemSummary, type CartItem } from "@/lib/cart";
 import type { AppliedVoucher } from "@/lib/vouchers";
 
 export type OrderType = "delivery" | "pickup";
+export type PaymentMethod = "cash_on_delivery" | "cash_on_pickup" | "paymongo";
+export type PaymentStatus = "unpaid" | "pending" | "paid" | "failed";
+export type OrderStatus = "pending" | "waiting_payment" | "preparing";
 
 export interface OrderTotals {
   subtotal: number;
@@ -41,7 +44,9 @@ export interface SavedOrder {
   items: Array<CartItem & { lineTotal: number; summary: string[] }>;
   totals: OrderTotals;
   voucher?: AppliedVoucher | null;
-  paymentMethod: string;
+  paymentMethod: PaymentMethod;
+  paymentStatus: PaymentStatus;
+  orderStatus: OrderStatus;
   status: "pending";
   createdAt: string;
 }
@@ -55,7 +60,9 @@ interface CreateOrderInput {
   items: CartItem[];
   totals: OrderTotals;
   voucher?: AppliedVoucher | null;
-  paymentMethod?: string;
+  paymentMethod: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  orderStatus?: OrderStatus;
 }
 
 const ORDER_SESSION_PREFIX = "bnb_order_success_";
@@ -111,7 +118,9 @@ export async function createOrder(input: CreateOrderInput) {
     })),
     totals: input.totals,
     voucher: input.voucher ?? null,
-    paymentMethod: input.paymentMethod || "Not selected",
+    paymentMethod: input.paymentMethod,
+    paymentStatus: input.paymentStatus ?? getDefaultPaymentStatus(input.paymentMethod),
+    orderStatus: input.orderStatus ?? getDefaultOrderStatus(input.paymentMethod),
     status: "pending",
     createdAt,
   };
@@ -121,8 +130,8 @@ export async function createOrder(input: CreateOrderInput) {
     customerName: order.customer.name,
     email: order.customer.email,
     mobileNumber: order.customer.mobile,
-    deliveryAddress: input.delivery?.address ?? null,
-    selectedBranch: input.pickup ?? null,
+    deliveryAddress: stripUndefined(input.delivery?.address ?? null),
+    selectedBranch: stripUndefined(input.pickup ?? null),
     subtotal: input.totals.subtotal,
     deliveryFee: input.totals.deliveryFee ?? 0,
     serviceFee: input.totals.serviceFee,
@@ -176,7 +185,9 @@ function normalizeSavedOrder(orderId: string, data: Record<string, unknown>): Sa
       total: Number(rawTotals.total ?? data.total ?? 0),
     },
     voucher: (data.voucher as AppliedVoucher | null | undefined) ?? null,
-    paymentMethod: String(data.paymentMethod || "Not selected"),
+    paymentMethod: normalizePaymentMethod(data.paymentMethod),
+    paymentStatus: normalizePaymentStatus(data.paymentStatus),
+    orderStatus: normalizeOrderStatus(data.orderStatus),
     status: "pending",
     createdAt: timestampToString(data.createdAt) || new Date().toISOString(),
   };
@@ -203,6 +214,40 @@ function createOrderId() {
   const timePart = Date.now().toString(36).toUpperCase();
   const randomPart = Math.random().toString(36).slice(2, 7).toUpperCase();
   return `BB-${timePart}-${randomPart}`;
+}
+
+function getDefaultPaymentStatus(paymentMethod: PaymentMethod): PaymentStatus {
+  return paymentMethod === "paymongo" ? "pending" : "unpaid";
+}
+
+function getDefaultOrderStatus(paymentMethod: PaymentMethod): OrderStatus {
+  return paymentMethod === "paymongo" ? "waiting_payment" : "pending";
+}
+
+function normalizePaymentMethod(value: unknown): PaymentMethod {
+  if (value === "cash_on_delivery" || value === "cash_on_pickup" || value === "paymongo") {
+    return value;
+  }
+
+  if (value === "Cash on Delivery") return "cash_on_delivery";
+  if (value === "Cash on Pickup") return "cash_on_pickup";
+  return "cash_on_delivery";
+}
+
+function normalizePaymentStatus(value: unknown): PaymentStatus {
+  if (value === "unpaid" || value === "pending" || value === "paid" || value === "failed") {
+    return value;
+  }
+
+  return "unpaid";
+}
+
+function normalizeOrderStatus(value: unknown): OrderStatus {
+  if (value === "pending" || value === "waiting_payment" || value === "preparing") {
+    return value;
+  }
+
+  return "pending";
 }
 
 function stripUndefined(value: unknown): unknown {

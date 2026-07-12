@@ -9,7 +9,6 @@ import {
   LogOut,
   Heart,
   MapPin,
-  Globe2,
   PackageCheck,
   Mail,
   Phone,
@@ -146,14 +145,6 @@ export default function Navbar({ cartCount, activeSection = "home", showSearch =
                 className="h-10 rounded-full bg-[#FF3B3B] px-5 text-sm font-black text-white shadow-[0_0_24px_rgba(255,59,59,0.25)] transition-all hover:bg-[#ff5252]"
               >
                 Sign up for free delivery
-              </button>
-              <button
-                type="button"
-                className="inline-flex h-10 items-center gap-2 rounded-full border border-transparent px-3 text-sm font-black text-white/75 transition-all hover:bg-white/[0.05] hover:text-white"
-                aria-label="Language selector"
-              >
-                <Globe2 className="h-5 w-5" />
-                EN
               </button>
               <button
                 type="button"

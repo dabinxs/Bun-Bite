@@ -2,8 +2,10 @@ import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation } from "wouter";
 import {
   ArrowLeft,
+  Banknote,
   CheckCircle2,
   Clock,
+  CreditCard,
   Edit3,
   Mail,
   MapPin,
@@ -26,7 +28,7 @@ import {
   type CartCustomization,
   type CartItem,
 } from "@/lib/cart";
-import { clearUserFirestoreCart, createOrder } from "@/lib/orders";
+import { clearUserFirestoreCart, createOrder, type PaymentMethod } from "@/lib/orders";
 import { getPickupBranch } from "@/lib/pickup";
 import {
   calculateVoucherDiscount,
@@ -50,6 +52,28 @@ interface PersonalDetails {
   lastName: string;
   mobile: string;
 }
+
+type PickupPaymentMethod = Extract<PaymentMethod, "cash_on_pickup" | "paymongo">;
+
+const PAYMENT_METHODS: Array<{
+  id: PickupPaymentMethod;
+  title: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  {
+    id: "cash_on_pickup",
+    title: "Cash on Pickup",
+    description: "Pay at the branch when you claim your order.",
+    icon: Banknote,
+  },
+  {
+    id: "paymongo",
+    title: "Online Payment",
+    description: "Pay by GCash, card, or QRPH during secure checkout.",
+    icon: CreditCard,
+  },
+];
 
 const EMPTY_DETAILS: PersonalDetails = {
   email: "",
@@ -85,6 +109,7 @@ export default function PickupReviewPage({
   const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderError, setOrderError] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState<PickupPaymentMethod>("cash_on_pickup");
   const editingProduct = useMemo(() => {
     if (!editingItem || editingItem.isDeal || editingItem.isCombo) return null;
     return PRODUCTS.find((product) => product.id === editingItem.productId) || null;
@@ -276,7 +301,7 @@ export default function PickupReviewPage({
                 discountAmount: totals.voucherDiscount,
               }
             : null,
-          paymentMethod: "Not selected",
+          paymentMethod,
         });
 
         await clearUserFirestoreCart(currentUser.uid);
@@ -396,6 +421,33 @@ export default function PickupReviewPage({
               </ReviewCard>
 
               <ReviewCard>
+                <div className="mb-5">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
+                    Mode of payment
+                  </p>
+                  <h2 className="mt-2 font-display text-2xl font-black text-white sm:text-3xl">
+                    Choose how to pay
+                  </h2>
+                  <p className="mt-2 text-sm text-white/40">
+                    Your selected payment mode will be saved with this pick-up order.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 md:grid-cols-2">
+                  {PAYMENT_METHODS.map((method) => (
+                    <PaymentMethodButton
+                      key={method.id}
+                      active={paymentMethod === method.id}
+                      icon={method.icon}
+                      title={method.title}
+                      description={method.description}
+                      onClick={() => setPaymentMethod(method.id)}
+                    />
+                  ))}
+                </div>
+              </ReviewCard>
+
+              <ReviewCard>
                 <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.18em] text-white/35">
@@ -491,6 +543,7 @@ export default function PickupReviewPage({
                 onApplyVoucher={handleApplyVoucher}
                 onRemoveVoucher={handleRemoveVoucher}
                 total={totals.total}
+                paymentMethodLabel={getPaymentMethodLabel(paymentMethod)}
                 canPlaceOrder={canPlaceOrder}
                 onAddMoreItems={() => setLocation(`/pickup/${branch.id}`)}
                 onEditItem={(item) => requireAuth(() => setEditingItem(item))}
@@ -602,6 +655,7 @@ function OrderSummary({
   onApplyVoucher,
   onRemoveVoucher,
   total,
+  paymentMethodLabel,
   canPlaceOrder,
   onAddMoreItems,
   onEditItem,
@@ -624,6 +678,7 @@ function OrderSummary({
   onApplyVoucher: () => void;
   onRemoveVoucher: () => void;
   total: number;
+  paymentMethodLabel: string;
   canPlaceOrder: boolean;
   onAddMoreItems: () => void;
   onEditItem: (item: CartItem) => void;
@@ -732,6 +787,7 @@ function OrderSummary({
         {voucherDiscount > 0 && (
           <SummaryLine label="Voucher discount" value={`- ${formatMoney(voucherDiscount, summaryCurrency)}`} />
         )}
+        <SummaryLine label="Payment method" value={paymentMethodLabel} />
         <div className="flex items-end justify-between gap-4 pt-3">
           <div>
             <p className="font-display text-2xl font-black text-white">Total</p>
@@ -765,6 +821,40 @@ function OrderSummary({
   );
 }
 
+function PaymentMethodButton({
+  active,
+  icon: Icon,
+  title,
+  description,
+  onClick,
+}: {
+  active: boolean;
+  icon: React.ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex min-h-[128px] flex-col items-start gap-3 rounded-2xl border p-4 text-left transition-all ${
+        active
+          ? "border-[#FF3B3B]/45 bg-[#FF3B3B]/12 shadow-[0_18px_45px_rgba(255,59,59,0.12)]"
+          : "border-white/10 bg-black/20 hover:border-[#FF3B3B]/30"
+      }`}
+    >
+      <span className="flex h-11 w-11 items-center justify-center rounded-full border border-white/10 bg-black/30">
+        <Icon className="h-5 w-5 text-[#FF4D2E]" />
+      </span>
+      <span>
+        <span className="block text-sm font-black text-white">{title}</span>
+        <span className="mt-1 block text-xs leading-relaxed text-white/40">{description}</span>
+      </span>
+    </button>
+  );
+}
+
 function SummaryLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between text-white/55">
@@ -776,6 +866,10 @@ function SummaryLine({ label, value }: { label: string; value: string }) {
 
 function getCartCurrency(items: CartItem[]) {
   return items.find((item) => item.currency === "PHP")?.currency || items.find((item) => item.currency)?.currency || "PHP";
+}
+
+function getPaymentMethodLabel(method: PickupPaymentMethod) {
+  return PAYMENT_METHODS.find((option) => option.id === method)?.title || "Cash on Pickup";
 }
 
 function formatMoney(value: number, currency: CartCurrency = "PHP") {
