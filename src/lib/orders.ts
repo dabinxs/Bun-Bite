@@ -14,7 +14,7 @@ import { buildCartItemSummary, type CartItem } from "@/lib/cart";
 import type { AppliedVoucher } from "@/lib/vouchers";
 
 export type OrderType = "delivery" | "pickup";
-export type PaymentMethod = "cash_on_delivery" | "cash_on_pickup" | "paymongo";
+export type PaymentMethod = "cash_on_delivery" | "cash_on_pickup" | "xendit" | "paymongo";
 export type PaymentStatus = "unpaid" | "pending" | "paid" | "failed";
 export type OrderStatus = "pending" | "waiting_payment" | "preparing";
 
@@ -217,18 +217,19 @@ function createOrderId() {
 }
 
 function getDefaultPaymentStatus(paymentMethod: PaymentMethod): PaymentStatus {
-  return paymentMethod === "paymongo" ? "pending" : "unpaid";
+  return paymentMethod === "xendit" || paymentMethod === "paymongo" ? "pending" : "unpaid";
 }
 
 function getDefaultOrderStatus(paymentMethod: PaymentMethod): OrderStatus {
-  return paymentMethod === "paymongo" ? "waiting_payment" : "pending";
+  return paymentMethod === "xendit" || paymentMethod === "paymongo" ? "waiting_payment" : "pending";
 }
 
 function normalizePaymentMethod(value: unknown): PaymentMethod {
-  if (value === "cash_on_delivery" || value === "cash_on_pickup" || value === "paymongo") {
+  if (value === "cash_on_delivery" || value === "cash_on_pickup" || value === "xendit" || value === "paymongo") {
     return value;
   }
 
+  if (value === "Online Payment" || value === "Xendit") return "xendit";
   if (value === "Cash on Delivery") return "cash_on_delivery";
   if (value === "Cash on Pickup") return "cash_on_pickup";
   return "cash_on_delivery";

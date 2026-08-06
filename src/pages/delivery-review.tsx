@@ -20,6 +20,7 @@ import {
 import MapPicker from "@/components/MapPicker";
 import Navbar from "@/components/navbar";
 import { CustomizeModal, PRODUCTS } from "@/components/menu";
+import { XenditPaymentModal } from "@/components/xendit-payment-modal";
 import VoucherBox from "@/components/voucher-box";
 import { useAuth } from "@/context/auth-context";
 import { auth, db } from "@/lib/firebase";
@@ -65,7 +66,7 @@ interface PersonalDetails {
 
 type DeliveryOption = "standard" | "priority";
 
-type DeliveryPaymentMethod = Extract<PaymentMethod, "cash_on_delivery" | "paymongo">;
+type DeliveryPaymentMethod = Extract<PaymentMethod, "cash_on_delivery" | "xendit" | "paymongo">;
 
 type LocationValue = {
   lat: number;
@@ -85,9 +86,9 @@ const PAYMENT_METHODS: Array<{
     icon: Banknote,
   },
   {
-    id: "paymongo",
-    title: "Online Payment",
-    description: "Pay by GCash, card, or QRPH during secure checkout.",
+    id: "xendit",
+    title: "Online Payment (Xendit)",
+    description: "Pay securely via GCash, Maya, GrabPay, Cards, or QR Ph.",
     icon: CreditCard,
   },
 ];
@@ -177,6 +178,14 @@ export default function DeliveryReviewPage({
   const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   const [placingOrder, setPlacingOrder] = useState(false);
   const [orderError, setOrderError] = useState("");
+  const [xenditModalOpen, setXenditModalOpen] = useState(false);
+  const [pendingXenditOrder, setPendingXenditOrder] = useState<{
+    orderId: string;
+    amount: number;
+    customerName: string;
+    invoiceUrl?: string;
+    isMock?: boolean;
+  } | null>(null);
   const editingProduct = useMemo(() => {
     if (!editingItem || editingItem.isDeal || editingItem.isCombo) return null;
     return PRODUCTS.find((product) => product.id === editingItem.productId) || null;
@@ -650,6 +659,61 @@ export default function DeliveryReviewPage({
           paymentMethod,
         });
 
+        if (paymentMethod === "xendit" || paymentMethod === "paymongo") {
+          let invoiceData: any = null;
+          try {
+            const successUrl = `${window.location.origin}/order-success/${encodeURIComponent(order.orderId)}`;
+            const cancelUrl = window.location.href;
+
+            const invoiceRes = await fetch("/api/xendit/create-invoice", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                orderId: order.orderId,
+                amount: totals.total,
+                customer: {
+                  name: `${personalDetails.firstName} ${personalDetails.lastName}`.trim(),
+                  email: personalDetails.email,
+                  mobile: personalDetails.mobile,
+                },
+                lineItems: cartItems.map((item) => ({
+                  name: item.name,
+                  quantity: item.quantity,
+                  unitPrice: item.unitPrice,
+                })),
+                successUrl,
+                cancelUrl,
+              }),
+            });
+
+            if (invoiceRes.ok) {
+              invoiceData = await invoiceRes.json();
+            }
+          } catch (err) {
+            console.warn("Xendit API server not reachable, using in-app payment modal.", err);
+          }
+
+          await clearUserFirestoreCart(currentUser.uid);
+          clearCart();
+
+          if (invoiceData?.invoiceUrl && !invoiceData.isMock && invoiceData.invoiceUrl.startsWith("http")) {
+            // Direct redirect to real Xendit Payment Gateway (checkout.xendit.co)
+            window.location.href = invoiceData.invoiceUrl;
+            return;
+          }
+
+          // Always open Xendit Payment Modal for online payments
+          setPendingXenditOrder({
+            orderId: order.orderId,
+            amount: totals.total,
+            customerName: `${personalDetails.firstName} ${personalDetails.lastName}`.trim(),
+            invoiceUrl: invoiceData?.invoiceUrl,
+            isMock: true,
+          });
+          setXenditModalOpen(true);
+          return;
+        }
+
         await clearUserFirestoreCart(currentUser.uid);
         clearCart();
         setLocation(`/order-success/${encodeURIComponent(order.orderId)}`);
@@ -1024,6 +1088,22 @@ export default function DeliveryReviewPage({
             setAddressFormMessage("");
           }}
           onSave={saveAddressFromModal}
+        />
+      )}
+
+      {xenditModalOpen && pendingXenditOrder && (
+        <XenditPaymentModal
+          isOpen={xenditModalOpen}
+          onClose={() => setXenditModalOpen(false)}
+          orderId={pendingXenditOrder.orderId}
+          amount={pendingXenditOrder.amount}
+          customerName={pendingXenditOrder.customerName}
+          invoiceUrl={pendingXenditOrder.invoiceUrl}
+          isMock={pendingXenditOrder.isMock}
+          onPaymentSuccess={() => {
+            setXenditModalOpen(false);
+            setLocation(`/order-success/${encodeURIComponent(pendingXenditOrder.orderId)}`);
+          }}
         />
       )}
     </div>

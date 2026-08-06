@@ -13,6 +13,18 @@ html {
   scroll-behavior: smooth;
 }
 
+/* Prevent Leaflet maps from bleeding through modal overlays */
+.leaflet-container {
+  z-index: 1 !important;
+}
+.leaflet-pane {
+  z-index: 1 !important;
+}
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 2 !important;
+}
+
 html,
 body,
 #root {
