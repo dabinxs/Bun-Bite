@@ -120,13 +120,13 @@ interface AddressFormState {
   isDefault: boolean;
 }
 
-const FALLBACK_DELIVERY_ADDRESS: DeliveryAddressState = {
+const EMPTY_DELIVERY_ADDRESS: DeliveryAddressState = {
   label: "Home",
-  line1: "Phase 2, Binan Laguna",
-  line2: "Block 37 Lot 13, Barangay Langkiwa, Binan City, Laguna",
+  line1: "",
+  line2: "",
   landmark: "",
   contactNumber: "",
-  isDefault: true,
+  isDefault: false,
 };
 
 const EMPTY_ADDRESS_FORM: AddressFormState = {
@@ -147,7 +147,7 @@ export default function DeliveryReviewPage({
 }: DeliveryReviewPageProps) {
   const { requireAuth, user, profile } = useAuth();
   const [, setLocation] = useLocation();
-  const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddressState>(FALLBACK_DELIVERY_ADDRESS);
+  const [deliveryAddress, setDeliveryAddress] = useState<DeliveryAddressState>(EMPTY_DELIVERY_ADDRESS);
   const [deliveryLocation, setDeliveryLocation] = useState<LocationValue>({
     lat: 14.3036,
     lng: 121.0781,
@@ -206,31 +206,48 @@ export default function DeliveryReviewPage({
     let cancelled = false;
 
     if (!user) {
+      setDeliveryAddress(EMPTY_DELIVERY_ADDRESS);
+      setSavedAddresses([]);
       setAddressSaved(false);
+      setNoteToRider("");
       return () => {
         cancelled = true;
       };
     }
 
+    setAddressesLoading(true);
     getDefaultUserAddress(user.uid)
       .then((address) => {
-        if (cancelled || !address) return;
-        const [line1, ...rest] = address.fullAddress.split("\n");
+        if (cancelled) return;
+        if (address) {
+          const [line1, ...rest] = address.fullAddress.split("\n");
 
-        setDeliveryAddress({
-          addressId: address.addressId,
-          label: address.label,
-          line1: line1 || address.fullAddress,
-          line2: rest.join("\n"),
-          landmark: address.landmark,
-          contactNumber: address.contactNumber,
-          isDefault: address.isDefault,
-        });
-        setNoteToRider((note) => note || address.noteToRider);
-        setAddressSaved(true);
+          setDeliveryAddress({
+            addressId: address.addressId,
+            label: address.label,
+            line1: line1 || address.fullAddress,
+            line2: rest.join("\n"),
+            landmark: address.landmark,
+            contactNumber: address.contactNumber,
+            isDefault: address.isDefault,
+          });
+          setNoteToRider((note) => note || address.noteToRider);
+          setAddressSaved(true);
+        } else {
+          setDeliveryAddress(EMPTY_DELIVERY_ADDRESS);
+          setAddressSaved(false);
+        }
       })
       .catch(() => {
-        // Keep the checkout usable with the visible address if Firestore is unavailable.
+        if (!cancelled) {
+          setDeliveryAddress(EMPTY_DELIVERY_ADDRESS);
+          setAddressSaved(false);
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setAddressesLoading(false);
+        }
       });
 
     return () => {
@@ -266,7 +283,11 @@ export default function DeliveryReviewPage({
     personalDetails.lastName.trim().length > 0 &&
     personalDetails.mobile.trim().length > 0;
 
-  const canPlaceOrder = detailsComplete && cartItems.length > 0 && !placingOrder;
+  const addressComplete =
+    deliveryAddress.line1.trim().length > 0 ||
+    deliveryAddress.line2.trim().length > 0;
+
+  const canPlaceOrder = detailsComplete && addressComplete && cartItems.length > 0 && !placingOrder;
 
   const updateDetail = (field: keyof PersonalDetails, value: string) => {
     setPersonalDetails((details) => ({ ...details, [field]: value }));
@@ -426,7 +447,7 @@ export default function DeliveryReviewPage({
           if (nextAddress) {
             applySavedAddressToCheckout(nextAddress);
           } else {
-            setDeliveryAddress(FALLBACK_DELIVERY_ADDRESS);
+            setDeliveryAddress(EMPTY_DELIVERY_ADDRESS);
             setAddressSaved(false);
           }
         }

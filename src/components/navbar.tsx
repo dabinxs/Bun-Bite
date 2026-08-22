@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
+import { getDefaultUserAddress } from "@/lib/addresses";
 
 interface NavbarProps {
   cartCount: number;
@@ -33,6 +34,33 @@ export default function Navbar({ cartCount, activeSection = "home", showSearch =
   const [location, setLocation] = useLocation();
   const isCartPage = location === "/cart";
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const [userAddressText, setUserAddressText] = useState<string>("New address");
+
+  useEffect(() => {
+    if (!user) {
+      setUserAddressText("New address");
+      return;
+    }
+
+    let cancelled = false;
+    getDefaultUserAddress(user.uid)
+      .then((address) => {
+        if (cancelled) return;
+        if (address) {
+          const firstLine = address.fullAddress.split("\n")[0]?.trim();
+          setUserAddressText(address.label || firstLine || "New address");
+        } else {
+          setUserAddressText("New address");
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setUserAddressText("New address");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 50);
@@ -123,12 +151,12 @@ export default function Navbar({ cartCount, activeSection = "home", showSearch =
 
             <button
               type="button"
-              onClick={() => openAuthModal("intro")}
+              onClick={() => (user ? setLocation("/profile/addresses") : openAuthModal("intro"))}
               className="hidden min-w-0 flex-1 items-center justify-center gap-2 text-sm font-bold text-white/75 transition-colors hover:text-white md:flex"
               aria-label="Choose delivery address"
             >
               <MapPin className="h-5 w-5 shrink-0 text-[#FF4D2E]" />
-              <span className="truncate">New address Biñan, Laguna</span>
+              <span className="truncate">{userAddressText}</span>
             </button>
 
             <div className="hidden shrink-0 items-center gap-3 lg:flex">
@@ -213,11 +241,11 @@ export default function Navbar({ cartCount, activeSection = "home", showSearch =
               <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4">
                 <button
                   type="button"
-                  onClick={() => openAuthModal("intro")}
+                  onClick={() => (user ? setLocation("/profile/addresses") : openAuthModal("intro"))}
                   className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] px-4 py-3 text-left text-sm font-bold text-white/75"
                 >
                   <MapPin className="h-5 w-5 text-[#FF4D2E]" />
-                  New address Biñan, Laguna
+                  {userAddressText}
                 </button>
                 <div className="grid grid-cols-2 gap-2">
                   <button

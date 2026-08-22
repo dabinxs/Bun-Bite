@@ -19,25 +19,38 @@ export default function ProfileFavoritesPage({ cartCount, addToCart }: ProfileFa
   const [favorites, setFavorites] = useState<FavoriteProduct[]>([]);
   const [loadingFavorites, setLoadingFavorites] = useState(false);
 
-  const loadFavorites = async () => {
-    if (!user) return;
-    setLoadingFavorites(true);
-    try {
-      setFavorites(await getUserFavorites(user.uid));
-    } finally {
-      setLoadingFavorites(false);
-    }
-  };
-
   useEffect(() => {
-    void loadFavorites();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    let cancelled = false;
+
+    if (!user) {
+      setFavorites([]);
+      setLoadingFavorites(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoadingFavorites(true);
+    getUserFavorites(user.uid)
+      .then((userFavs) => {
+        if (!cancelled) setFavorites(userFavs);
+      })
+      .catch(() => {
+        if (!cancelled) setFavorites([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingFavorites(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
   }, [user]);
 
   const handleRemove = async (favoriteId: string) => {
     if (!user) return;
     await removeUserFavorite(user.uid, favoriteId);
-    await loadFavorites();
+    setFavorites(await getUserFavorites(user.uid));
   };
 
   const handleAddToCart = (favorite: FavoriteProduct) => {

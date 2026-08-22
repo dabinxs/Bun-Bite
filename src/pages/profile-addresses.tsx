@@ -32,20 +32,45 @@ export default function ProfileAddressesPage({ cartCount }: ProfileAddressesPage
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
 
-  const loadAddresses = async () => {
-    if (!user) return;
+  useEffect(() => {
+    let cancelled = false;
+
+    if (!user) {
+      setAddresses([]);
+      setForm(EMPTY_FORM);
+      setEditingId(null);
+      setMessage("");
+      setLoadingAddresses(false);
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setLoadingAddresses(true);
+    getUserAddresses(user.uid)
+      .then((userAddresses) => {
+        if (!cancelled) setAddresses(userAddresses);
+      })
+      .catch(() => {
+        if (!cancelled) setAddresses([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingAddresses(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const refreshAddresses = async (userId: string) => {
     setLoadingAddresses(true);
     try {
-      setAddresses(await getUserAddresses(user.uid));
+      setAddresses(await getUserAddresses(userId));
     } finally {
       setLoadingAddresses(false);
     }
   };
-
-  useEffect(() => {
-    void loadAddresses();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user]);
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
@@ -73,7 +98,7 @@ export default function ProfileAddressesPage({ cartCount }: ProfileAddressesPage
       }
 
       resetForm();
-      await loadAddresses();
+      await refreshAddresses(user.uid);
     } catch {
       setMessage("We couldn't save the address yet. Please try again.");
     } finally {
@@ -97,13 +122,13 @@ export default function ProfileAddressesPage({ cartCount }: ProfileAddressesPage
     if (!user) return;
     await deleteUserAddress(user.uid, addressId);
     if (editingId === addressId) resetForm();
-    await loadAddresses();
+    await refreshAddresses(user.uid);
   };
 
   const handleSetDefault = async (addressId: string) => {
     if (!user) return;
     await setDefaultUserAddress(user.uid, addressId);
-    await loadAddresses();
+    await refreshAddresses(user.uid);
   };
 
   return (
