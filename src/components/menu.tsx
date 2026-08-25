@@ -20,6 +20,8 @@ import {
 } from "@/lib/cart";
 import { useAuth } from "@/context/auth-context";
 import { getUserFavoriteIds, toggleUserFavorite } from "@/lib/favorites";
+import { collection, onSnapshot } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 type ProductCategory = "burgers" | "drinks" | "family" | "sides" | "desserts";
 type CategoryKey = "all" | ProductCategory;
@@ -528,6 +530,51 @@ export default function MenuSection({ onAddToCart }: MenuProps) {
   const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
   const [touchedExpand, setTouchedExpand] = useState<Set<number>>(new Set());
   const [customizeProduct, setCustomizeProduct] = useState<Product | null>(null);
+  const [overrides, setOverrides] = useState<Record<number, { price: number; isAvailable: boolean }>>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    const unsubscribe = onSnapshot(collection(db, "menuOverrides"), (snapshot) => {
+      if (cancelled) return;
+      const data: Record<number, { price: number; isAvailable: boolean }> = {};
+      snapshot.docs.forEach((doc) => {
+        const docData = doc.data();
+        data[Number(doc.id)] = {
+          price: Number(docData.price),
+          isAvailable: docData.isAvailable !== false,
+        };
+      });
+      setOverrides(data);
+    }, (error) => {
+      console.warn("Could not load menu overrides:", error);
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  const overriddenProducts = useMemo(() => {
+    return PRODUCTS.map((product) => {
+      const override = overrides[product.id];
+      if (override) {
+        return {
+          ...product,
+          price: String(override.price),
+          isAvailable: override.isAvailable,
+        };
+      }
+      return {
+        ...product,
+        isAvailable: true,
+      };
+    });
+  }, [overrides]);
+
+  const visibleProducts = useMemo(() => {
+    return overriddenProducts.filter((product) => product.isAvailable);
+  }, [overriddenProducts]);
 
   useEffect(() => {
     let cancelled = false;
@@ -590,18 +637,18 @@ export default function MenuSection({ onAddToCart }: MenuProps) {
       CATEGORIES.reduce<Record<CategoryKey, number>>((counts, category) => {
         counts[category.key] =
           category.key === "all"
-            ? PRODUCTS.length
-            : PRODUCTS.filter((product) => product.category === category.key).length;
+            ? visibleProducts.length
+            : visibleProducts.filter((product) => product.category === category.key).length;
         return counts;
       }, {} as Record<CategoryKey, number>),
-    []
+    [visibleProducts]
   );
 
   const filteredProducts = useMemo(() => {
     const categoryProducts =
       activeCategory === "all"
-        ? [...PRODUCTS]
-        : PRODUCTS.filter((product) => product.category === activeCategory);
+        ? [...visibleProducts]
+        : visibleProducts.filter((product) => product.category === activeCategory);
 
     let refinedProducts = categoryProducts;
 
@@ -626,7 +673,7 @@ export default function MenuSection({ onAddToCart }: MenuProps) {
     }
 
     return sortedProducts;
-  }, [activeCategory, selectedSort]);
+  }, [activeCategory, selectedSort, visibleProducts]);
 
   const activeCategoryLabel = CATEGORIES.find((category) => category.key === activeCategory)?.label ?? "All";
   const selectedSortOption = SORT_OPTIONS.find((option) => option.key === selectedSort) ?? SORT_OPTIONS[0];

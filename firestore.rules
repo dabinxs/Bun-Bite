@@ -10,36 +10,59 @@ service cloud.firestore {
       return signedIn() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return signedIn() && (
+        (request.auth.token.email != null && request.auth.token.email.matches('.*admin.*')) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.isAdmin == true) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
     match /users/{userId} {
-      allow read, create, update, delete: if ownsUserDocument(userId);
+      allow read, create, update, delete: if ownsUserDocument(userId) || isAdmin();
 
       match /cart/{cartItemId} {
-        allow read, create, update, delete: if ownsUserDocument(userId);
+        allow read, create, update, delete: if ownsUserDocument(userId) || isAdmin();
       }
 
       match /addresses/{addressId} {
-        allow read, create, update, delete: if ownsUserDocument(userId);
+        allow read, create, update, delete: if ownsUserDocument(userId) || isAdmin();
       }
 
       match /favorites/{favoriteId} {
-        allow read, create, update, delete: if ownsUserDocument(userId);
+        allow read, create, update, delete: if ownsUserDocument(userId) || isAdmin();
       }
 
       match /orders/{orderId} {
-        allow read, create: if ownsUserDocument(userId);
-        allow update, delete: if false;
+        allow read, create: if ownsUserDocument(userId) || isAdmin();
+        allow update: if isAdmin();
+        allow delete: if false;
       }
 
       match /voucherRedemptions/{voucherCode} {
-        allow read, create: if ownsUserDocument(userId);
-        allow update, delete: if false;
+        allow read, create: if ownsUserDocument(userId) || isAdmin();
+        allow update: if isAdmin();
+        allow delete: if false;
       }
     }
 
     match /orders/{orderId} {
       allow create: if signedIn() && request.resource.data.userId == request.auth.uid;
-      allow read: if signedIn() && resource.data.userId == request.auth.uid;
-      allow update, delete: if false;
+      allow read: if signedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow update: if signedIn() && isAdmin();
+      allow delete: if false;
+    }
+
+    match /vouchers/{voucherCode} {
+      allow read: if true;
+      allow write: if signedIn() && isAdmin();
+    }
+
+    match /menuOverrides/{itemId} {
+      allow read: if true;
+      allow write: if signedIn() && isAdmin();
     }
   }
 }

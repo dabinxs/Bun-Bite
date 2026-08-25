@@ -27,6 +27,7 @@ import ProfilePage from "@/pages/profile";
 import ProfileAddressesPage from "@/pages/profile-addresses";
 import ProfileFavoritesPage from "@/pages/profile-favorites";
 import ProfileOrdersPage from "@/pages/profile-orders";
+import AdminPage from "@/pages/admin";
 import { useThemeMode } from "@/hooks/use-theme-mode";
 import { auth, db } from "@/lib/firebase";
 import { getCartItemSignature, normalizeCartItemCurrency, type CartItem } from "@/lib/cart";
@@ -387,6 +388,12 @@ function App() {
               </Route>
               <Route path="/pickup">
                 <PickupPage cartCount={cartCount} />
+              </Route>
+              <Route path="/admin">
+                <AdminPage />
+              </Route>
+              <Route path="/admin/:tab">
+                <AdminPage />
               </Route>
               <Route component={NotFound} />
             </Switch>

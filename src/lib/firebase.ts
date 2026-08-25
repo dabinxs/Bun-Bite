@@ -11,6 +11,16 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID,
 };
 
+const missingConfig = Object.entries(firebaseConfig)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+if (missingConfig.length > 0) {
+  throw new Error(
+    `Firebase is not configured. Add the missing VITE_FIREBASE_* values to .env.local: ${missingConfig.join(", ")}`,
+  );
+}
+
 export const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);

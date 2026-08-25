@@ -12,6 +12,7 @@ import {
   PackageCheck,
   Mail,
   Phone,
+  ShieldCheck,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/auth-context";
@@ -122,6 +123,12 @@ export default function Navbar({ cartCount, activeSection = "home", showSearch =
     "Bun & Bite Member";
   const profileMobile = profile?.mobileNumber?.trim() || profile?.mobile?.trim() || "No mobile number added.";
   const profileInitial = profileName.charAt(0).toUpperCase();
+
+  const isAdmin =
+    userEmail?.includes("admin") ||
+    userEmail === "admin@bunbite.com" ||
+    profile?.isAdmin === true ||
+    (profile as any)?.role === "admin";
 
   if (!user) {
     return (
@@ -454,6 +461,16 @@ export default function Navbar({ cartCount, activeSection = "home", showSearch =
                       </div>
 
                       <div className="border-t border-white/8 p-2">
+                        {isAdmin && (
+                          <DropdownItem
+                            icon={<ShieldCheck className="w-4 h-4" />}
+                            label="Admin Panel"
+                            onClick={() => {
+                              setAccountOpen(false);
+                              setLocation("/admin");
+                            }}
+                          />
+                        )}
                         <DropdownItem
                           icon={<User className="w-4 h-4" />}
                           label="My Profile"

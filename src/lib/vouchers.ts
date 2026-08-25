@@ -1,5 +1,5 @@
 import type { OrderType } from "@/lib/orders";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export type VoucherType = "fixed" | "percentage" | "freeDelivery";
@@ -61,6 +61,21 @@ export const VOUCHERS: VoucherDefinition[] = [
   },
 ];
 
+let dbVouchers: VoucherDefinition[] = [];
+
+try {
+  onSnapshot(collection(db, "vouchers"), (snapshot) => {
+    dbVouchers = snapshot.docs.map((doc) => ({
+      code: doc.id,
+      ...doc.data(),
+    } as VoucherDefinition));
+  }, (error) => {
+    console.warn("Could not load dynamic vouchers from Firestore:", error);
+  });
+} catch (err) {
+  console.warn("Firestore not initialized in vouchers.ts:", err);
+}
+
 export function validateVoucher({
   code,
   subtotal,
@@ -74,7 +89,14 @@ export function validateVoucher({
     return { ok: false, message: "Enter a voucher code first." } as const;
   }
 
-  const voucher = VOUCHERS.find((item) => item.code === cleanCode);
+  const combinedVouchers = [...dbVouchers];
+  VOUCHERS.forEach((sv) => {
+    if (!combinedVouchers.some((dv) => dv.code === sv.code)) {
+      combinedVouchers.push(sv);
+    }
+  });
+
+  const voucher = combinedVouchers.find((item) => item.code === cleanCode);
 
   if (!voucher) {
     return { ok: false, message: "That voucher code is not valid." } as const;
