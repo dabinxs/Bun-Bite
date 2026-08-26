@@ -75,7 +75,9 @@
     "zod": "catalog:"
   },
   "dependencies": {
+    "@vercel/node": "^7.0.0",
     "firebase": "^12.15.0",
+    "firebase-admin": "^14.3.0",
     "leaflet": "^1.9.4",
     "react-leaflet": "^5.0.0"
   }

@@ -4,11 +4,7 @@
   },
   "hosting": {
     "public": "dist/public",
-    "ignore": [
-      "firebase.json",
-      "**/.*",
-      "**/node_modules/**"
-    ],
+    "ignore": ["firebase.json", "**/.*", "**/node_modules/**"],
     "rewrites": [
       {
         "source": "**",
@@ -29,7 +25,7 @@
         "*.local"
       ],
       "predeploy": [
-        "npm --prefix \"$RESOURCE_DIR\" run build"
+        "node functions/node_modules/typescript/bin/tsc -p functions/tsconfig.json"
       ]
     }
   ]
