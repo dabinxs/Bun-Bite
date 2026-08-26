@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getAdminDb } from "../_firebase-admin.js";
-import { allowCors, rejectUnlessPost } from "../_http.js";
+import { getAdminDb } from "../_firebase-admin";
+import { allowCors, rejectUnlessPost } from "../_http";
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (rejectUnlessPost(request, response)) return;
@@ -37,6 +37,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     allowCors(response);
     response.status(200).json({ ok: true });
   } catch (error) {
+    allowCors(response);
     response.status(500).json({ error: error instanceof Error ? error.message : "Webhook handling failed." });
   }
 }
