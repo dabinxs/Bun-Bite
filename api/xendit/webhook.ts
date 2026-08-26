@@ -1,5 +1,4 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { getAdminDb } from "../_firebase-admin";
 import { allowCors, rejectUnlessPost } from "../_http";
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
@@ -12,6 +11,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
   }
 
   try {
+    const { getAdminDb } = await import("../_firebase-admin");
     const { external_id: orderId, status } = request.body || {};
     if (!orderId || !["PAID", "SETTLED", "EXPIRED"].includes(status)) {
       response.status(400).json({ error: "Invalid webhook payload." });

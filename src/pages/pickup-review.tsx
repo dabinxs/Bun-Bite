@@ -347,8 +347,8 @@ export default function PickupReviewPage({
         await clearUserFirestoreCart(currentUser.uid);
         clearCart();
         setLocation(`/order-success/${encodeURIComponent(order.orderId)}`);
-      } catch {
-        setOrderError("We couldn't place your pick-up order yet. Please check your connection and try again.");
+      } catch (error) {
+        setOrderError(error instanceof Error ? error.message : "We couldn't place your pick-up order yet. Please check your connection and try again.");
       } finally {
         setPlacingOrder(false);
       }

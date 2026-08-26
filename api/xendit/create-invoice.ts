@@ -1,6 +1,5 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
 import { allowCors, rejectUnlessPost, requireUser } from "../_http";
-import { getAdminDb } from "../_firebase-admin";
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (rejectUnlessPost(request, response)) return;
@@ -17,6 +16,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
       return;
     }
 
+    const { getAdminDb } = await import("../_firebase-admin");
     const orderSnapshot = await getAdminDb().collection("orders").doc(orderId).get();
     const order = orderSnapshot.data();
     if (!orderSnapshot.exists || order?.userId !== user.uid || Number(order.total) !== numericAmount) {
