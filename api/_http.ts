@@ -28,6 +28,6 @@ export async function requireUser(request: VercelRequest) {
 }
 
 async function getUserFromToken(token: string) {
-  const { getAdminAuth } = await import("./_firebase-admin.js");
+  const { getAdminAuth } = await import("./_firebase-admin");
   return getAdminAuth().verifyIdToken(token);
 }

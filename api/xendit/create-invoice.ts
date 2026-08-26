@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from "@vercel/node";
-import { allowCors, rejectUnlessPost, requireUser } from "../_http.js";
-import { getAdminDb } from "../_firebase-admin.js";
+import { allowCors, rejectUnlessPost, requireUser } from "../_http";
+import { getAdminDb } from "../_firebase-admin";
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (rejectUnlessPost(request, response)) return;
@@ -50,6 +50,7 @@ export default async function handler(request: VercelRequest, response: VercelRe
     allowCors(response);
     response.status(200).json({ invoiceUrl: result.invoice_url, invoiceId: result.id });
   } catch (error) {
+    allowCors(response);
     response.status(500).json({ error: error instanceof Error ? error.message : "Payment setup failed." });
   }
 }
